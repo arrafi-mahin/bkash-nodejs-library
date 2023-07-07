@@ -1,81 +1,79 @@
 const axios = require('axios');
-const { grantToken } = require('./Token');
 
-async function getHeadersForAgreement(ceredentials) {
-    const { appKey } = ceredentials
-    const tokenResponse = await grantToken(ceredentials);
-    const id_token = tokenResponse.id_token;
+// async function getHeadersForAgreement(ceredentials) {
+//     const { appKey } = ceredentials
+//     const tokenResponse = await grantToken(ceredentials);
+//     const id_token = tokenResponse.id_token;
 
-    return {
-        'Authorization': id_token,
-        'X-App-Key': appKey,
-    };
-}
+//     return {
+//         'Authorization': id_token,
+//         'X-App-Key': appKey,
+//     };
+// }
 
 
-async function createAgreement(ceredentials) {
-    const { username, password, appKey, appSecret, baseUrl } = ceredentials
+async function createAgreement(payerReference, callbackURL, amount, headers, baseUrl) {
     const url = `${baseUrl}tokenized/checkout/create`;
+
     try {
-        const headers = await getHeadersForAgreement(ceredentials);
-
+        // const headers = this.getHeaders(false);
         const data = {
-            'mode': '0000',
-            'payerReference': '01970851626',
-            'callbackURL': 'https://rafi.netlify.app',
-            'amount': '0.01',
-            'currency': 'BDT',
-            'intent': 'sale'
-
+            mode: '0000',
+            payerReference,
+            callbackURL,
+            amount,
+            currency: 'BDT',
+            intent: 'sale'
         };
-        const response = await axios.post(url, data, { headers });
-        return response.data
 
+        const response = await axios.post(url, data, { headers });
+        return response.data;
     } catch (error) {
-        console.log(error);
+        throw new Error('Error in createAgreement');
     }
 }
 
 
-async function executeAgreement(ceredentials) {
-    const { username, password, appKey, appSecret, baseUrl } = ceredentials
+async function executeAgreement(headers, baseUrl, paymentID) {
     const url = `${baseUrl}tokenized/checkout/execute`;
+
     try {
-        const res = await createAgreement(ceredentials);
-        const paymentID = res.paymentID;
-        const headers = await getHeadersForAgreement(ceredentials)
+        // const headers = this.getHeaders(false);
         const data = {
             paymentID
         };
 
         const response = await axios.post(url, data, { headers });
-        return response.data
-
+        return response.data;
     } catch (error) {
-        console.log(error);
+        throw new Error('Error in executeAgreement');
     }
 }
 
-async function queryAgreement(ceredentials) {
-    const { baseUrl } = ceredentials
-    const url = `${baseUrl}tokenized/checkout/execute`;
+//naming wrong
+async function queryAgreement(headers, baseUrl, agreementID, operation) {
+    let url;
+    if (operation === 'query') {
+        url = `${baseUrl}tokenized/checkout/agreement/status`;
+    }
+    else {
+        url = `${baseUrl}tokenized/checkout/agreement/cancel`;
+    }
+
     try {
-        const res = await executeAgreement(ceredentials);
-        const agreementID = res.agreementID;
-        const headers = await getHeadersForAgreement(ceredentials)
+        // const headers = this.getHeaders(false);
         const data = {
             agreementID
         };
 
-        const response = await axios.post(url, data, { headers });
-        return response.data
+        // axios call method  for axios reuse
 
+        const response = await axios.post(url, data, { headers });
+        return response.data;
     } catch (error) {
-        console.log(error);
+        throw new Error('Error in queryAgreement');
     }
 }
-
-
 
 
 

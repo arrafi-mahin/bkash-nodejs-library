@@ -1,30 +1,10 @@
-// const express = require('express')
 const axios = require('axios');
+// import as a whole
 const { createAgreement, executeAgreement, queryAgreement } = require('./methods/Agreement');
-// const { refreshToken } = require('./methods/Token');
-
-// const { createAgreement } = require('./services/payment/Agreement');
-
-// const app = express()
-// const port = process.env.PORT || 5000
-
-
-
-// app.get('/createAgreement', createAgreement)
-
-
-
-// username = "sandboxTokenizedUser02"
-
-
-// password = "sandboxTokenizedUser02@12345"
-
-
-// appKey = "4f6o0cjiki2rfm34kfdadl1eqq"
-
-
-// appSecret = "2is7hdktrekvrbljjh44ll3d9l1dtjo4pasmjvs5vl5qr3fug4b"
-
+const { grantToken, refreshAccessToken } = require('./methods/Token');
+const { createPayment, executePayment } = require('./methods/Payment');
+const { searchPayment } = require('./methods/Search');
+const { refundPayment, checkRefund } = require('./methods/Refund');
 
 
 const sandbox = 'https://tokenized.sandbox.bka.sh/v1.2.0-beta/';
@@ -37,116 +17,151 @@ const appSecret = '2is7hdktrekvrbljjh44ll3d9l1dtjo4pasmjvs5vl5qr3fug4b';
 const isLive = false;
 
 class Bkash {
+    id_token = "";
+    refreshToken = "";
+    paymentId = ""; // not needed here
+    agreementId = '';  // not needed here
+    invoicePaymentId = ''; // not needed here
+    invoiceAgreementId = ''; // not needed here
+    trxId = ''; // not needed here
+    refundAmount = ''; // not needed here
+
+
     constructor(username, password, appKey, appSecret, isLive) {
+        // object // serial break for function
         this.username = username;
         this.password = password;
         this.appKey = appKey;
         this.appSecret = appSecret;
         this.baseUrl = isLive ? live : sandbox;
 
+
         this.scheduleRecurringFunction();
-        this.grantToken();
+        this.res()
     }
+    async res() {
+        const headers = await this.getHeaders(true)
+        const data = await grantToken(headers, this.appKey, this.appSecret, this.baseUrl)
+        this.id_token = data.id_token;
+        this.refreshToken = data.refresh_token;
+        // console.log(this.id_token);
+    }
+
+    async getHeaders(isToken) {
+
+        if (isToken) {
+            return {
+                'username': this.username,
+                'password': this.password,
+            };
+        }
+        return {
+            'Authorization': this.id_token,
+            'X-App-Key': this.appKey,
+        };
+
+    }
+
 
     scheduleRecurringFunction() {
         const intervalInMilliseconds = 55 * 60 * 1000; // 55 minutes
         setInterval(async () => {
-            await this.refreshToken();
+            const headers = await this.getHeaders(true)
+            const data = await refreshAccessToken(headers, this.appKey, this.appSecret, this.baseUrl, this.refreshToken);
+            this.id_token = data.id_token;
+            this.refreshToken = data.refresh_token;
         }, intervalInMilliseconds);
+
+        // interval clear when destructing object
     }
 
-    async grantToken() {
-        const { username, password, appKey, appSecret, baseUrl } = this;
-        const url = `${baseUrl}tokenized/checkout/token/grant`;
 
-        const headers = {
-            username,
-            password
-        };
-        const data = {
-            app_key: appKey,
-            app_secret: appSecret,
-        };
-
-        try {
-            const response = await axios.post(url, data, { headers });
-            // console.log(response.data);
-            return response.data;
-        } catch (error) {
-            throw new Error('Error in grantToken request');
-        }
+// convention maintain for name
+    async cAgreement(payerReference, callbackURL, amount) {
+        const headers = await this.getHeaders(false)
+        const response = await createAgreement(payerReference, callbackURL, amount, headers, this.baseUrl)
+        console.log(response);
+        this.paymentId = response.paymentID
+        return response
+    }
+    async eAgreement(paymentId) {
+        const headers = await this.getHeaders(false)
+        const response = await executeAgreement(headers, this.baseUrl, paymentId)
+        this.agreementId = response.agreementID
+        // console.log(response);
+        return response
+    }
+    async checkAgreement(agreementID, operation) {
+        const headers = await this.getHeaders(false)
+        const response = await queryAgreement(headers, this.baseUrl, agreementID, operation)
+        // console.log(response);
+        return response
+    }
+    async cPayment(agreementID, payerReference, callbackURL, amount, merchantInvoiceNumber) {
+        const headers = await this.getHeaders(false)
+        const response = await createPayment(headers, this.baseUrl, agreementID, payerReference, callbackURL, amount, merchantInvoiceNumber)
+        // console.log(response);
+        this.invoicePaymentId = response.paymentID
+        this.invoiceAgreementId = response.agreementID
+        console.log(response);
+        return response
     }
 
-    async refreshToken() {
-        const { username, password, appKey, appSecret, baseUrl } = this;
-        const url = `${baseUrl}tokenized/checkout/token/refresh`;
-
-        try {
-            const tokenResponse = await this.grantToken();
-            const refreshToken = tokenResponse.refresh_token;
-
-            const headers = {
-                username,
-                password
-            };
-
-            const data = {
-                app_key: appKey,
-                app_secret: appSecret,
-                refresh_token: refreshToken
-            };
-
-            const response = await axios.post(url, data, { headers });
-            // console.log("refresh", response.data);
-            return response.data;
-        } catch (error) {
-            throw new Error(error.response.data.statusMessage);
-        }
+    async ePayment(paymentID, operation) {
+        const headers = await this.getHeaders(false)
+        const response = await executePayment(headers, this.baseUrl, paymentID, operation)
+        this.trxID = response.trxID
+        // console.log(response);
+        return response
     }
-    async getHeadersForAgreement() {
-        const { username, password } = this;
-        const tokenResponse = await this.grantToken();
-        const token = tokenResponse.id_token;
 
-        return {
-            'Authorization': token,
-            'X-App-Key': appKey,
-        };
+    async search(trxID) {
+        const headers = await this.getHeaders(false)
+        const response = await searchPayment(headers, this.baseUrl, trxID)
+        // console.log(response);
+        this.refundAmount = response.amount
+        return response
     }
-    async createAgreement(payerReference, callbackURL, amount) {
-        const { username, password, appKey, appSecret, baseUrl } = this;
-        const url = `${baseUrl}tokenized/checkout/create`;
 
-        try {
-            const headers = await this.getHeadersForAgreement();
-
-            const data = {
-                mode: '0000',
-                payerReference,
-                callbackURL,
-                amount,
-                currency: 'BDT',
-                intent: 'sale'
-            };
-
-            const response = await axios.post(url, data, { headers });
-            return response.data;
-        } catch (error) {
-            console.log(error);
-        }
+    async reqRefund(paymentID, amount, trxID, sku, reason) {
+        const headers = await this.getHeaders(false)
+        const response = await refundPayment(headers, this.baseUrl, paymentID, amount, trxID, sku, reason)
+        // console.log(response);
+        return response
     }
+
+    async refundStatus(paymentID, trxID) {
+        const headers = await this.getHeaders(false)
+        const response = await checkRefund(headers, this.baseUrl, paymentID, trxID)
+        // console.log(response);
+        return response
+    }
+
 }
 
 
+
 const b = new Bkash(username, password, appKey, appSecret, isLive);
-b.createAgreement('01970851626', 'https://rafi.netlify.app', '0.01')
-// grantToken(ceredentials)
-// refreshToken(ceredentials)
-// createAgreement(ceredentials)
-// executeAgreement(ceredentials)
-// queryAgreement(ceredentials)
 
+async function run() {
 
-// app.listen(port, () => {
-//     console.log(`portal listening on port ${port}`)
-// })
+}
+
+// setTimeout(async () => {
+//     const res = await b.cAgreement('01770618575', 'https://rafi.netlify.app', '100')
+//     // if (res.paymentId) {
+//     //     console.log(b.paymentId, b.agreementId);
+//     //     // const agree = await b.eAgreement(b.paymentId)
+//     //     // if (agree) {
+//     //     //     b.checkAgreement(b.agreementId, 'query')
+//     //     //     b.checkAgreement(b.agreementId, 'cancel')
+//     //     // }
+//     // }
+//     // b.cPayment(b.agreementId, '01970851626', 'https://rafi.netlify.app', '100', '72')
+//     // b.ePayment(b.invoicePaymentId, 'execute')
+//     // b.search(b.trxId)
+//     // b.reqRefund(b.invoicePaymentId, b.trxId, b.refundAmount, 'Iphone', 'color pochondo hoi nai')
+//     // b.refundStatus(b.trxId, b.refundAmount)
+// }, 3000)
+
+module.exports = Bkash

@@ -1,54 +1,40 @@
-const axios = require('axios')
-async function grantToken(credentials) {
-    const { username, password, appKey, appSecret, baseUrl } = credentials;
-    const url = `${baseUrl}tokenized/checkout/token/grant`;
+const axios = require('axios');
 
-    const headers = {
-        username,
-        password
-    };
+function grantToken(headers, appKey, appSecret, baseUrl) {
+    const url = `${baseUrl}/tokenized/checkout/token/grant`;
+    
+
     const data = {
         'app_key': appKey,
         'app_secret': appSecret,
     };
 
-    try {
-        const response = await axios.post(url, data, { headers });
-        // console.log(response.data);
-        return response.data;
-    } catch (error) {
-        throw new Error('Error in grantToken request');
-    }
+    return axios.post(url, data, { headers })
+        .then(response => response.data)
+        .catch(error => {
+            throw new Error('Error in grantToken request');
+        });
 }
 
+function refreshAccessToken(headers, appKey, appSecret, baseUrl, refreshToken) {
+    const url = `${baseUrl}/tokenized/checkout/token/refresh`;
 
-async function refreshToken(ceredentials) {
-    const { username, password, appKey, appSecret, baseUrl } = ceredentials
-    const url = `${baseUrl}tokenized/checkout/token/refresh`;
-    try {
-        const tokenResponse = await grantToken(ceredentials);
-        const refreshToken = tokenResponse.refresh_token;
 
-        const headers = {
-            username,
-            password
-        };
 
-        const data = {
-            'app_key': appKey,
-            'app_secret': appSecret,
-            'refresh_token': refreshToken
-        };
+    const data = {
+        'app_key': appKey,
+        'app_secret': appSecret,
+        'refresh_token': refreshToken,
+    };
 
-        const response = await axios.post(url, data, { headers });
-        // console.log("refresh",response.data);
-        return response.data
-
-    } catch (error) {
-        // console.log(error);
-    }
+    return axios.post(url, data, { headers })
+        .then(response => response.data)
+        .catch(error => {
+            throw new Error('Error in refresh token');
+        });
 }
 
 module.exports = {
-    grantToken, refreshToken
+    grantToken,
+    refreshAccessToken
 };

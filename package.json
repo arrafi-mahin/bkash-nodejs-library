@@ -13,5 +13,17 @@
   "license": "ISC",
   "dependencies": {
     "axios": "^1.4.0"
-  }
+  },
+  "directories": {
+    "lib": "lib"
+  },
+  "devDependencies": {},
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/arrafi-mahin/bkash-nodejs-library.git"
+  },
+  "bugs": {
+    "url": "https://github.com/arrafi-mahin/bkash-nodejs-library/issues"
+  },
+  "homepage": "https://github.com/arrafi-mahin/bkash-nodejs-library#readme"
 }
